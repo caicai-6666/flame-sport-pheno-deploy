@@ -1,0 +1,162 @@
+name: flame-sport-pheno
+
+services:
+  mysql:
+    build:
+      context: ./mysql
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在顶层 .env 中设置 MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-flame_sport_pheno}
+      MYSQL_USER: ${MYSQL_USER:-flame}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在顶层 .env 中设置 MYSQL_PASSWORD}
+    ports:
+      # 初期部署允许宿主机和外部测试工具直连；生产环境应结合防火墙限制来源地址。
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - flame_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./flame-sport-pheno-be
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_MODE: ${APP_MODE:-production}
+      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-flame}:${MYSQL_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-flame_sport_pheno}?charset=utf8mb4
+      DB_ECHO: ${DB_ECHO:-false}
+      DINGTALK_CLIENT_ID: ${DINGTALK_CLIENT_ID:-}
+      DINGTALK_CLIENT_SECRET: ${DINGTALK_CLIENT_SECRET:-}
+      DINGTALK_HTTP_TIMEOUT_SECONDS: ${DINGTALK_HTTP_TIMEOUT_SECONDS:-5}
+      DINGTALK_ACCESS_TOKEN_REFRESH_INTERVAL_SECONDS: ${DINGTALK_ACCESS_TOKEN_REFRESH_INTERVAL_SECONDS:-300}
+      DINGTALK_ACCESS_TOKEN_REFRESH_SKEW_SECONDS: ${DINGTALK_ACCESS_TOKEN_REFRESH_SKEW_SECONDS:-300}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_HTTP_TIMEOUT_SECONDS: ${DEEPSEEK_HTTP_TIMEOUT_SECONDS:-60}
+      LLM_PRELIMINARY_REVIEW_ENABLED: ${LLM_PRELIMINARY_REVIEW_ENABLED:-false}
+      LLM_PRELIMINARY_REVIEW_INTERVAL_SECONDS: ${LLM_PRELIMINARY_REVIEW_INTERVAL_SECONDS:-900}
+      LLM_PRELIMINARY_REVIEW_MIN_AGE_SECONDS: ${LLM_PRELIMINARY_REVIEW_MIN_AGE_SECONDS:-300}
+      AUTH_CACHE_TTL_SECONDS: ${AUTH_CACHE_TTL_SECONDS:-7200}
+      AUTH_CACHE_CLEANUP_INTERVAL_SECONDS: ${AUTH_CACHE_CLEANUP_INTERVAL_SECONDS:-300}
+      SEASON_PARTICIPATION_ALLOWED_DAYS: ${SEASON_PARTICIPATION_ALLOWED_DAYS:-7}
+      LEADERBOARD_REFRESH_ENABLED: ${LEADERBOARD_REFRESH_ENABLED:-true}
+      LEADERBOARD_REFRESH_ON_STARTUP: ${LEADERBOARD_REFRESH_ON_STARTUP:-true}
+      LEADERBOARD_REFRESH_INTERVAL_SECONDS: ${LEADERBOARD_REFRESH_INTERVAL_SECONDS:-900}
+      IMAGE_CACHE_MAX_AGE_SECONDS: ${IMAGE_CACHE_MAX_AGE_SECONDS:-1204800}
+    ports:
+      # 仅供宿主机 Nginx 访问；管理端容器通过 backend:8000 走 Compose 内网。
+      - "127.0.0.1:${BACKEND_PORT:-18000}:8000"
+    volumes:
+      # 资源脱离 Git 工作区，频繁拉取或重新 clone 后端仓库不会影响运行期文件。
+      - flame_backend_assets:/workspace/assets
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./flame-sport-pheno-fe
+      dockerfile: Dockerfile
+      args:
+        VUE_APP_API_BASE_URL: ${VUE_APP_API_BASE_URL:-/flame/api}
+        VUE_APP_SHOP_REDEEM_WINDOW_DAYS: ${VUE_APP_SHOP_REDEEM_WINDOW_DAYS:-7}
+        VUE_APP_PAGE_TITLE: ${VUE_APP_PAGE_TITLE:-燃动现象}
+        VUE_APP_DINGTALK_CORP_ID: ${VUE_APP_DINGTALK_CORP_ID:-}
+        VUE_APP_DINGTALK_CLIENT_ID: ${VUE_APP_DINGTALK_CLIENT_ID:-}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-18080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/flame/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  manage-backend:
+    build:
+      context: ./flame-sport-pheno-manage-be
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${MANAGE_APP_NAME:-燃动现象管理端后端}
+      APP_ENV: ${MANAGE_APP_ENV:-production}
+      APP_DEBUG: ${MANAGE_APP_DEBUG:-false}
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      API_PREFIX: /flame/admin/api
+      PUBLIC_API_PREFIX: /flame/admin/api
+      CORS_ORIGINS: ${MANAGE_CORS_ORIGINS:-[]}
+      ADMIN_KEY: ${MANAGE_ADMIN_KEY:?请在顶层 .env 中设置 MANAGE_ADMIN_KEY}
+      ADMIN_TOKEN_TTL_SECONDS: ${MANAGE_ADMIN_TOKEN_TTL_SECONDS:-28800}
+      ADMIN_TOKEN_CACHE_MAX_SIZE: ${MANAGE_ADMIN_TOKEN_CACHE_MAX_SIZE:-1000}
+      ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS: ${ACTIVE_SEASON_CONFIG_EDIT_WINDOW_HOURS:-24}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-flame}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在顶层 .env 中设置 MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-flame_sport_pheno}
+      MYSQL_CHARSET: ${MANAGE_MYSQL_CHARSET:-utf8mb4}
+      MYSQL_ECHO: ${MANAGE_MYSQL_ECHO:-false}
+      MYSQL_POOL_SIZE: ${MANAGE_MYSQL_POOL_SIZE:-5}
+      MYSQL_MAX_OVERFLOW: ${MANAGE_MYSQL_MAX_OVERFLOW:-5}
+      MYSQL_POOL_RECYCLE_SECONDS: ${MANAGE_MYSQL_POOL_RECYCLE_SECONDS:-1800}
+      CLIENT_BACKEND_BASE_URL: ${MANAGE_CLIENT_BACKEND_BASE_URL:-http://backend:8000/flame/api/admin}
+      CLIENT_BACKEND_TIMEOUT_SECONDS: ${MANAGE_CLIENT_BACKEND_TIMEOUT_SECONDS:-10}
+      IMAGE_CACHE_SECONDS: ${MANAGE_IMAGE_CACHE_SECONDS:-1204800}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_HTTP_TIMEOUT_SECONDS: ${DEEPSEEK_HTTP_TIMEOUT_SECONDS:-60}
+      OPENAI_API_KEY: ${MANAGE_OPENAI_API_KEY:-}
+    ports:
+      # 仅向宿主机回环地址开放；容器间请求使用 manage-backend:8000。
+      - "127.0.0.1:${MANAGE_BACKEND_PORT:-18001}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/flame/admin/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  manage-frontend:
+    build:
+      context: ./flame-sport-pheno-manage-fe
+      dockerfile: Dockerfile
+      args:
+        APP_ENV: production
+        VITE_PRODUCTION_APP_BASE_PATH: ${MANAGE_APP_BASE_PATH:-/flame/admin/}
+        VITE_PRODUCTION_API_BASE_PATH: ${MANAGE_API_BASE_PATH:-/flame/admin/api}
+    restart: unless-stopped
+    ports:
+      # 生产域名的宿主机 Nginx 应将 /flame/admin/ 转发到此回环端口。
+      - "127.0.0.1:${MANAGE_FRONTEND_PORT:-18081}:80"
+    depends_on:
+      manage-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/flame/admin/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  flame_mysql_data:
+  flame_backend_assets:

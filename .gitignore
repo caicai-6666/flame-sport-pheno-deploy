@@ -1,0 +1,13 @@
+# 部署仓库采用白名单，只跟踪部署编排和 MySQL 初始化文件。
+*
+
+!.gitignore
+!.env.example
+!docker-compose.yml
+
+!mysql/
+mysql/*
+!mysql/Dockerfile
+!mysql/init/
+mysql/init/*
+!mysql/init/*.sql

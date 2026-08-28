@@ -153,7 +153,8 @@ CREATE TABLE `proof_record` (
   `note` varchar(255) DEFAULT NULL COMMENT '用户备注',
   `proof_date` date NOT NULL COMMENT '凭证对应的实际运动日期',
   `review_status` varchar(32) NOT NULL DEFAULT 'pending' COMMENT '审核状态：pending待初审，preliminary_approved初审通过，preliminary_rejected初审失败，approved终审通过，rejected终审失败',
-  `review_comment` varchar(500) DEFAULT NULL COMMENT '审核评论，用于后台人员填写审核说明',
+  `review_comment` varchar(500) DEFAULT NULL COMMENT '管理员终审意见；初审不得写入',
+  `preliminary_review_comment` varchar(500) DEFAULT NULL COMMENT '大模型初审意见；终审不得覆盖；月末审核可作为同项目月初基线',
   `progress_delta` decimal(5,4) NOT NULL DEFAULT '0.0000' COMMENT '大模型初审给出的原始项目进度增量',
   `increase` decimal(5,4) NOT NULL DEFAULT '0.0000' COMMENT '当前凭证实际分配到项目进度条的贡献',
   `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '状态：1正常，0无效/删除',
@@ -238,7 +239,6 @@ CREATE TABLE `user` (
   `name` varchar(64) NOT NULL COMMENT '用户名称',
   `department_id` varchar(64) NOT NULL COMMENT '所属部门ID',
   `avatar_url` varchar(255) DEFAULT NULL COMMENT '头像地址',
-  `height_cm` decimal(5,2) DEFAULT NULL COMMENT '用户身高，单位厘米，用于BMI计算',
   `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '状态：1启用，0停用',
   PRIMARY KEY (`id`),
   KEY `idx_user_department_id` (`department_id`),
@@ -273,5 +273,3 @@ CREATE TABLE `user_suggestion` (
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
-
-

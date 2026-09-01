@@ -231,6 +231,23 @@ CREATE TABLE `season_user_project` (
   CONSTRAINT `chk_season_user_project_completion_progress` CHECK (((`completion_progress` >= 0) and (`completion_progress` <= 1)))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='赛季用户项目表';
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `season_supplement_eligibility`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `season_supplement_eligibility` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '赛季补传资格记录ID',
+  `season_user_id` bigint unsigned NOT NULL COMMENT '赛季用户记录ID',
+  `proof_record_id` bigint unsigned NOT NULL COMMENT '允许补传的凭证记录ID',
+  `preliminary_review_context_snapshot` json DEFAULT NULL COMMENT '补交初审上下文快照，资格重开时不得覆盖',
+  `status` tinyint unsigned NOT NULL DEFAULT '1' COMMENT '资格状态：0关闭，1可补传，2待初审，3初审通过',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_season_supplement_proof_record` (`proof_record_id`),
+  KEY `idx_season_supplement_user_status` (`season_user_id`,`status`,`id`),
+  CONSTRAINT `fk_season_supplement_proof_record` FOREIGN KEY (`proof_record_id`) REFERENCES `proof_record` (`id`),
+  CONSTRAINT `fk_season_supplement_season_user` FOREIGN KEY (`season_user_id`) REFERENCES `season_user` (`id`),
+  CONSTRAINT `chk_season_supplement_status` CHECK ((`status` in (0,1,2,3)))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='赛季补传资格表';
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `user`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

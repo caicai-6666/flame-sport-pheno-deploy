@@ -155,6 +155,9 @@ services:
       AGENT_QUERY_EVENT_HISTORY_SIZE: ${AGENT_QUERY_EVENT_HISTORY_SIZE:-200}
       AGENT_QUERY_SESSION_TTL_SECONDS: ${AGENT_QUERY_SESSION_TTL_SECONDS:-3600}
       AGENT_QUERY_SSE_HEARTBEAT_SECONDS: ${AGENT_QUERY_SSE_HEARTBEAT_SECONDS:-15}
+      AGENT_QUERY_HISTORY_PATH: ${AGENT_QUERY_HISTORY_PATH:-/workspace/data/query-history/query-history.sqlite3}
+      AGENT_QUERY_HISTORY_RETENTION_DAYS: ${AGENT_QUERY_HISTORY_RETENTION_DAYS:-30}
+      AGENT_QUERY_HISTORY_CACHE_TTL_SECONDS: ${AGENT_QUERY_HISTORY_CACHE_TTL_SECONDS:-600}
       AGENT_QUERY_DIAGNOSTIC_LOG_ENABLED: ${AGENT_QUERY_DIAGNOSTIC_LOG_ENABLED:-false}
       AGENT_QUERY_DIAGNOSTIC_LOG_LEVEL: ${AGENT_QUERY_DIAGNOSTIC_LOG_LEVEL:-basic}
     ports:
@@ -165,6 +168,8 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+    volumes:
+      - flame_manage_data:/workspace/data
     depends_on:
       mysql:
         condition: service_healthy
@@ -202,3 +207,4 @@ services:
 volumes:
   flame_mysql_data:
   flame_backend_assets:
+  flame_manage_data:

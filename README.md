@@ -135,6 +135,33 @@ docker compose config >/dev/null
 
 注意：`docker compose config` 的完整输出会包含展开后的密码，不要将输出粘贴到日志或工单中。
 
+---
+
+## 客户端定时初审配置
+
+客户端后端通过标准异步 Responses API 调用 DeepSeek，初审模型默认使用已验证的 `deepseek-flash`。以下变量由部署目录 `.env` 读取并注入 `backend` 容器：
+
+| 变量 | 默认值 | 行为 |
+| --- | --- | --- |
+| `LLM_PRELIMINARY_REVIEW_ENABLED` | `false` | 是否启动定时初审 |
+| `LLM_PRELIMINARY_REVIEW_INTERVAL_SECONDS` | `900` | 每轮结束后的等待秒数 |
+| `LLM_PRELIMINARY_REVIEW_MIN_AGE_SECONDS` | `300` | 上传后至少等待的秒数 |
+| `LLM_PRELIMINARY_REVIEW_MIN_BATCH_SIZE` | `10` | 当前待审数量门槛，必须为正整数 |
+| `LLM_PRELIMINARY_REVIEW_CONCURRENCY` | `3` | 单个定时批次并发的用户项目组数，必须为正整数 |
+
+连续第三次非空扫描仍未达到数量门槛时，会审核本轮符合条件的记录。空扫描、赛季切换或进程重启会重置等待计数。不同用户项目并发，同组串行且月初优先；该并发限制不覆盖管理端立即初审，也不是多实例全局限制。
+
+已有部署的 `.env` 请补入最小数量和并发数，并核对 `DEEPSEEK_MODEL=deepseek-flash`；仅修改模板不会覆盖已有 `.env`。配置变更后在部署目录执行以下命令重新创建后端容器，单纯 `docker compose restart` 不会更新容器环境变量：
+
+```bash
+docker compose config --quiet
+docker compose up -d --no-deps backend
+```
+
+如同时更新了后端代码，使用 `docker compose up -d --build --no-deps backend`。管理员查询智能体使用独立的 `AGENT_QUERY_DEEPSEEK_*` 配置，不受本节初审配置影响。
+
+---
+
 ## 初始化数据库和资源卷
 
 ### 全新数据库
